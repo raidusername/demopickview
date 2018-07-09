@@ -7,6 +7,8 @@ import android.os.Handler;
 import android.os.Message;
 import android.support.v7.app.AppCompatActivity;
 import android.view.View;
+import android.widget.Button;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import com.bigkoo.pickerview.builder.OptionsPickerBuilder;
@@ -15,6 +17,14 @@ import com.bigkoo.pickerview.view.OptionsPickerView;
 
 import com.demo.zrodo.demo1.bean.JsonBean;
 import com.google.gson.Gson;
+import com.inuker.bluetooth.library.BluetoothClient;
+import com.inuker.bluetooth.library.beacon.Beacon;
+import com.inuker.bluetooth.library.connect.listener.BluetoothStateListener;
+import com.inuker.bluetooth.library.receiver.listener.BluetoothBondListener;
+import com.inuker.bluetooth.library.search.SearchRequest;
+import com.inuker.bluetooth.library.search.SearchResult;
+import com.inuker.bluetooth.library.search.response.SearchResponse;
+import com.inuker.bluetooth.library.utils.BluetoothLog;
 
 import org.json.JSONArray;
 
@@ -27,8 +37,8 @@ import java.util.ArrayList;
  * @date 2017-3-16
  */
 public class JsonDataActivity extends AppCompatActivity implements View.OnClickListener {
-
-
+    private TextView tv_selected_area;
+    private Button btn_BTC;
     private ArrayList<JsonBean> options1Items = new ArrayList<>();
     private ArrayList<ArrayList<String>> options2Items = new ArrayList<>();
     private ArrayList<ArrayList<ArrayList<String>>> options3Items = new ArrayList<>();
@@ -36,14 +46,22 @@ public class JsonDataActivity extends AppCompatActivity implements View.OnClickL
     private static final int MSG_LOAD_DATA = 0x0001;
     private static final int MSG_LOAD_SUCCESS = 0x0002;
     private static final int MSG_LOAD_FAILED = 0x0003;
+    BluetoothClient mClient;
 
     private boolean isLoaded = false;
+    private final BluetoothBondListener mBluetoothBondListener = new BluetoothBondListener() {
+        @Override
+        public void onBondStateChanged(String mac, int bondState) {
+            // bondState = Constants.BOND_NONE, BOND_BONDING, BOND_BONDED
+        }
+    };
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_json_data);
         initView();
+
     }
 
     @SuppressLint("HandlerLeak")
@@ -78,8 +96,11 @@ public class JsonDataActivity extends AppCompatActivity implements View.OnClickL
     };
 
     private void initView() {
+        tv_selected_area = (TextView) findViewById(R.id.tv_selected_area);
+        btn_BTC = (Button) findViewById(R.id.btn_BTC);
         findViewById(R.id.btn_data).setOnClickListener(this);
         findViewById(R.id.btn_show).setOnClickListener(this);
+        btn_BTC.setOnClickListener(this);
     }
 
     @Override
@@ -89,18 +110,106 @@ public class JsonDataActivity extends AppCompatActivity implements View.OnClickL
                 mHandler.sendEmptyMessage(MSG_LOAD_DATA);
                 break;
             case R.id.btn_show:
-                if (isLoaded) {
-                    showPickerView();
-                } else {
-                    Toast.makeText(JsonDataActivity.this, "Please waiting until the data is parsed", Toast.LENGTH_SHORT).show();
-                }
+                getdate();
+//                if (isLoaded) {
+//                    showPickerView();
+//                } else {
+//                    Toast.makeText(JsonDataActivity.this, "Please waiting until the data is parsed", Toast.LENGTH_SHORT).show();
+//                }
+                break;
+            case R.id.btn_BTC:
+                MyBTC();
                 break;
         }
     }
 
+    private void MyBTC() {
+        mClient = new BluetoothClient(this);
+        if (mClient.isBluetoothOpened()) {//判断蓝牙是否打开
+            searchBT();
+        } else {
+            mClient.openBluetooth();//打开蓝牙
+
+            BluetoothStateListener mBluetoothStateListener = new BluetoothStateListener() {
+                @Override
+                public void onBluetoothStateChanged(boolean openOrClosed) {
+
+                    if (openOrClosed) {
+                        searchBT();
+                    }
+                }
+
+            };
+            mClient.registerBluetoothStateListener(mBluetoothStateListener);
+            // mClient.unregisterBluetoothStateListener(mBluetoothStateListener);
+        }
+
+    }
+
+    private void searchBT() {
+        SearchRequest request = new SearchRequest.Builder()
+               // .searchBluetoothLeDevice(3000, 3)   // 先扫BLE设备3次，每次3s
+                .searchBluetoothClassicDevice(5000) // 再扫经典蓝牙5s
+               // .searchBluetoothLeDevice(2000)      // 再扫BLE设备2s
+                .build();
+        mClient.search(request, new SearchResponse() {
+            @Override
+            public void onSearchStarted() {
+
+            }
+
+            @Override
+            public void onDeviceFounded(final SearchResult device) {
+                Beacon beacon = new Beacon(device.scanRecord);
+                BluetoothLog.v(String.format("beacon for %s\n%s", device.getAddress(), beacon.toString()));
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        if (device.getName() == null||device.getName().equals("")) {
+                        } else {
+                            tv_selected_area.append(device.getAddress() + "名字" + device.getName() + ".........................");
+                        }
+                    }
+                });
+
+            }
+
+            @Override
+            public void onSearchStopped() {
+
+            }
+
+            @Override
+            public void onSearchCanceled() {
+
+            }
+        });
+    }
+
+    private synchronized void getdate() {
+        //获取数据
+        new Thread(new Runnable() {
+            @Override
+            public synchronized void run() {
+                initJsonData();
+
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        if (isLoaded) {
+                            showPickerView();
+                        } else {
+                            Toast.makeText(JsonDataActivity.this, "Please waiting until the data is parsed", Toast.LENGTH_SHORT).show();
+                        }
+                    }
+                });
+
+            }
+        }).start();
+
+    }
 
     private void showPickerView() {// 弹出选择器
-
         OptionsPickerView pvOptions = new OptionsPickerBuilder(this, new OnOptionsSelectListener() {
             @Override
             public void onOptionsSelect(int options1, int options2, int options3, View v) {
@@ -108,7 +217,7 @@ public class JsonDataActivity extends AppCompatActivity implements View.OnClickL
                 String tx = options1Items.get(options1).getPickerViewText() +
                         options2Items.get(options1).get(options2) +
                         options3Items.get(options1).get(options2).get(options3);
-
+                tv_selected_area.setText(tx);
                 Toast.makeText(JsonDataActivity.this, tx, Toast.LENGTH_SHORT).show();
             }
         })
@@ -174,7 +283,8 @@ public class JsonDataActivity extends AppCompatActivity implements View.OnClickL
             options3Items.add(Province_AreaList);
         }
 
-        mHandler.sendEmptyMessage(MSG_LOAD_SUCCESS);
+        isLoaded = true;
+//        mHandler.sendEmptyMessage(MSG_LOAD_SUCCESS);
 
     }
 

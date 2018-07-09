@@ -9,6 +9,20 @@
     android:paddingLeft="@dimen/activity_horizontal_margin"
     android:paddingRight="@dimen/activity_horizontal_margin"
     android:paddingTop="@dimen/activity_vertical_margin">
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_weight="1">
+        <TextView
+            android:id="@+id/tv_selected_area"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="显示选择的地点"
+            android:textColor="#00ff00"
+            android:gravity="center"
+            android:textSize="20sp"/>
+
+    </ScrollView>
 
     <Button
         android:id="@+id/btn_data"
@@ -22,5 +36,11 @@
         android:layout_height="wrap_content"
         android:text="@string/picker_text_show"
         android:layout_marginTop="@dimen/activity_horizontal_margin" />
+    <Button
+        android:id="@+id/btn_BTC"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="@dimen/activity_horizontal_margin"
+        android:text="连接蓝牙"/>
 
 </LinearLayout>
